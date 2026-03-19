@@ -4,18 +4,20 @@ export default async function handler(req, res) {
   const [user, repoName] = repo.split('/');
 
   try {
-    // ÉTAPE 1 : Si l'IA demande de créer le repo
+    // Création du repo si demandé
     if (createRepo) {
       await fetch(`https://api.github.com/user/repos`, {
         method: "POST",
-        headers: { "Authorization": `token ${GH_TOKEN}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ name: repoName, private: false, auto_init: true })
+        headers: { 
+          "Authorization": `token ${GH_TOKEN}`, 
+          "Content-Type": "application/json" 
+        },
+        body: JSON.stringify({ name: repoName, auto_init: true })
       });
-      // On attend un peu que GitHub initialise le repo
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 2000)); // Pause pour l'initialisation
     }
 
-    // ÉTAPE 2 : Récupérer le SHA (pour mise à jour)
+    // Récupération du SHA pour modification
     const getFile = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
       headers: { "Authorization": `token ${GH_TOKEN}` }
     });
@@ -26,10 +28,13 @@ export default async function handler(req, res) {
       sha = fileData.sha;
     }
 
-    // ÉTAPE 3 : Écrire le code
+    // Écriture du fichier
     const response = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
       method: "PUT",
-      headers: { "Authorization": `token ${GH_TOKEN}`, "Content-Type": "application/json" },
+      headers: { 
+        "Authorization": `token ${GH_TOKEN}`, 
+        "Content-Type": "application/json" 
+      },
       body: JSON.stringify({
         message: message,
         content: btoa(unescape(encodeURIComponent(content))),
@@ -38,7 +43,7 @@ export default async function handler(req, res) {
     });
 
     if (response.ok) res.status(200).json({ success: true });
-    else res.status(500).json({ error: "Erreur écriture" });
+    else res.status(500).json({ error: "Erreur d'écriture GitHub" });
 
   } catch (error) {
     res.status(500).json({ error: error.message });
