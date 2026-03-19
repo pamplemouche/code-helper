@@ -1,39 +1,43 @@
 export default async function handler(req, res) {
   const GEMINI_KEY = process.env.GEMINI_API_KEY;
-  const { prompt, history } = req.body; // <-- On reçoit l'historique maintenant
+  const { prompt, history } = req.body;
 
   try {
-    const messages = history || []; // On initialise l'historique
-    messages.push({ role: "user", parts: [{ text: prompt }] }); // Ajoute la nouvelle instruction
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`, {
+    // On utilise le modèle PRO pour plus de précision
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_KEY}`;
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: messages, // <-- On envoie TOUT l'historique
+        contents: history || [], 
         generationConfig: {
           response_mime_type: "application/json",
+          temperature: 0.1 // Très bas pour éviter les erreurs de syntaxe
         },
+        system_instruction: {
+          parts: [{ text: "Tu es l'ingénieur principal de Pamplemouche OS. Tu génères du code JS/HTML/CSS robuste. Réponds TOUJOURS au format JSON: {'path': 'string', 'code': 'string', 'explanation': 'string'}" }]
+        }
       })
     });
 
     const data = await response.json();
     
     if (data.error) {
-        return res.status(200).json({ explanation: "Erreur Google: " + data.error.message, path: "error.log", code: "" });
+        return res.status(500).json({ error: "Erreur Google: " + data.error.message });
     }
 
-    const geminiResponseText = data.candidates[0].content.parts[0].text;
-    const jsonParsed = JSON.parse(geminiResponseText);
+    const text = data.candidates[0].content.parts[0].text;
+    const jsonParsed = JSON.parse(text);
 
     res.status(200).json({
-        path: jsonParsed.path || "logs/note.txt",
-        code: jsonParsed.code || "// Aucun code généré",
-        explanation: jsonParsed.explanation || "Action effectuée",
-        fullResponse: data.candidates[0].content // <-- On renvoie la réponse complète pour l'historique
+        path: jsonParsed.path,
+        code: jsonParsed.code,
+        explanation: jsonParsed.explanation,
+        fullResponse: data.candidates[0].content 
     });
 
   } catch (e) {
-    res.status(200).json({ explanation: "Erreur Script: " + e.message, path: "error.log", code: "" });
+    res.status(500).json({ error: "Erreur : " + e.message });
   }
 }
