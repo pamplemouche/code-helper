@@ -8,17 +8,20 @@ export default async function handler(req, res) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: history || [], 
-        generationConfig: { response_mime_type: "application/json", temperature: 0.1 },
+        generationConfig: { 
+          response_mime_type: "application/json", 
+          temperature: 0.1 
+        },
         system_instruction: {
-          parts: [{ text: `Tu es un Engine de Déploiement. 
-            Tu peux créer des fichiers ET des dépôts.
-            Si l'utilisateur demande un nouveau projet, définis "createRepo": true.
+          parts: [{ text: `Tu es l'Engine de Déploiement Universel.
+            Tu maîtrises tous les langages et peux créer des dépôts GitHub.
+            Si l'utilisateur demande un OS Web, génère un système avec VFS et Kernel.
             
-            FORMAT JSON :
+            Format JSON obligatoire :
             {
-              "repo": "USER/REPO_NAME",
-              "path": "filename.ext",
-              "code": "CODE",
+              "repo": "USER/REPO",
+              "path": "chemin/fichier.ext",
+              "code": "CONTENU",
               "createRepo": true/false,
               "explanation": "DESCRIPTION"
             }` }]
@@ -27,8 +30,17 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
+    
+    // Sécurité anti-crash
+    if (!data.candidates || !data.candidates[0]) {
+      throw new Error("L'IA n'a pas répondu correctement.");
+    }
+
     const text = data.candidates[0].content.parts[0].text;
-    res.status(200).json({ ...JSON.parse(text), fullResponse: data.candidates[0].content });
+    res.status(200).json({ 
+      ...JSON.parse(text), 
+      fullResponse: data.candidates[0].content 
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
