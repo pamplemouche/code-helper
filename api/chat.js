@@ -8,20 +8,20 @@ export default async function handler(req, res) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: history || [], 
-        generationConfig: { 
-            response_mime_type: "application/json", 
-            temperature: 0.7 
-        },
+        generationConfig: { response_mime_type: "application/json", temperature: 0.2 },
         system_instruction: {
-          parts: [{ text: `Tu es le partenaire de dev de Pamplemouche. 
-            Tu peux discuter normalement (champ 'text') et générer du code (champs 'code', 'path', 'repo').
+          parts: [{ text: `Tu es l'unité de déploiement Pamplemouche. 
+            Dès que l'utilisateur demande une modification ou une création :
+            1. Remplis 'text' avec ton explication.
+            2. Remplis OBLIGATOIREMENT 'code', 'path' et 'repo'.
+            3. Ne mets JAMAIS de blocs de code Markdown dans le champ 'text'.
             
-            Format JSON obligatoire :
+            JSON STRICT :
             {
-              "text": "Ta réponse textuelle ici (obligatoire)",
-              "repo": "USER/REPO",
-              "path": "chemin/fichier.js",
-              "code": "le code ici",
+              "text": "Explication ici",
+              "repo": "PSEUDO/REPO",
+              "path": "chemin/du/fichier.js",
+              "code": "CONTENU COMPLET DU FICHIER",
               "createRepo": false
             }` }]
         }
@@ -29,13 +29,10 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    const rawOutput = data.candidates[0].content.parts[0].text;
-    const json = JSON.parse(rawOutput);
-
-    res.status(200).json({ 
-      ...json, 
-      fullResponse: data.candidates[0].content 
-    });
+    if (!data.candidates) throw new Error("Erreur API Google");
+    
+    const json = JSON.parse(data.candidates[0].content.parts[0].text);
+    res.status(200).json({ ...json, fullResponse: data.candidates[0].content });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
