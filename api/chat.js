@@ -2,32 +2,36 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Interdit');
 
   const { prompt, context } = req.body;
+  const GEMINI_KEY = process.env.GEMINI_API_KEY;
 
   try {
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "deepseek-chat", // Ou "deepseek-reasoner" pour le modèle R1 ultra puissant
-        messages: [
-          { role: "system", content: "Tu es Pamplemouche-Dev-AI. Code uniquement en JS/HTML/CSS. Pas de blabla." },
-          { role: "user", content: `CONTEXTE: ${context}\n\nINSTRUCTION: ${prompt}` }
-        ],
-        stream: false
+        contents: [{
+          parts: [{
+            text: `Tu es Pamplemouche-Dev-AI. 
+                  CONTEXTE OS: ${context}
+                  INSTRUCTION: ${prompt}
+                  
+                  Réponds UNIQUEMENT avec le code brut (JS, HTML ou CSS). 
+                  Pas de balises markdown type \`\`\`javascript, juste le texte du code.`
+          }]
+        }]
       })
     });
 
     const data = await response.json();
     
-    if (data.choices && data.choices.length > 0) {
-      res.status(200).json({ completion: data.choices[0].message.content });
+    if (data.candidates && data.candidates[0].content.parts[0].text) {
+      res.status(200).json({ completion: data.candidates[0].content.parts[0].text });
     } else {
-      res.status(500).json({ error: "Réponse vide de DeepSeek" });
+      res.status(500).json({ error: "Réponse vide de Gemini", details: data });
     }
   } catch (error) {
-    res.status(500).json({ error: "Erreur de connexion à DeepSeek" });
+    res.status(500).json({ error: "Erreur de connexion à Gemini" });
   }
 }
