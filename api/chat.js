@@ -8,40 +8,27 @@ export default async function handler(req, res) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: history || [], 
-        generationConfig: {
-          response_mime_type: "application/json",
-          temperature: 0.2
-        },
+        generationConfig: { response_mime_type: "application/json", temperature: 0.1 },
         system_instruction: {
-          parts: [{ text: `Tu es un Engine de Développement Universel. 
-            Tu ne poses pas de questions, tu n'analyses pas le langage : tu PRODUIS.
-            Si l'utilisateur demande un OS Web, conçois une architecture de Machine Virtuelle (VFS, Kernel, Interface de gestion de processus).
+          parts: [{ text: `Tu es un Engine de Déploiement. 
+            Tu peux créer des fichiers ET des dépôts.
+            Si l'utilisateur demande un nouveau projet, définis "createRepo": true.
             
-            Tu dois extraire le repo cible du contexte ou demander dans lequel coder.
-            
-            RÉPONSE JSON STRICTE :
+            FORMAT JSON :
             {
-              "repo": "user/repo",
-              "path": "chemin/du/fichier",
-              "code": "CONTENU_BRUT_DU_CODE",
-              "explanation": "DESCRIPTION_COURTE"
+              "repo": "USER/REPO_NAME",
+              "path": "filename.ext",
+              "code": "CODE",
+              "createRepo": true/false,
+              "explanation": "DESCRIPTION"
             }` }]
         }
       })
     });
 
     const data = await response.json();
-    if (data.error) throw new Error(data.error.message);
-
-    const jsonParsed = JSON.parse(data.candidates[0].content.parts[0].text.trim());
-
-    res.status(200).json({
-        repo: jsonParsed.repo,
-        path: jsonParsed.path,
-        code: jsonParsed.code,
-        explanation: jsonParsed.explanation,
-        fullResponse: data.candidates[0].content 
-    });
+    const text = data.candidates[0].content.parts[0].text;
+    res.status(200).json({ ...JSON.parse(text), fullResponse: data.candidates[0].content });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
