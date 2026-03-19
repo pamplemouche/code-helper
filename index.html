@@ -4,65 +4,143 @@
     <meta charset="UTF-8">
     <title>Pamplemouche Dev Control</title>
     <style>
-        body { background: #0a0a0a; color: #ff8c00; font-family: 'Courier New', monospace; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; }
-        h1 { border-bottom: 2px solid #ff8c00; padding-bottom: 10px; }
+        body { background: #0a0a0a; color: #ff8c00; font-family: 'Courier New', monospace; padding: 20px; margin: 0; }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; border: 1px solid #333; border-radius: 8px; box-shadow: 0 0 15px rgba(255,140,0,0.3); }
+        h1 { border-bottom: 2px solid #ff8c00; padding-bottom: 10px; color: #fff; text-align: center; }
+        .input-area { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #ff8c00; font-weight: bold; }
         textarea { 
-            width: 100%; height: 150px; 
+            width: 100%; height: 120px; 
             background: #1a1a1a; color: #fff; 
             border: 1px solid #ff8c00; padding: 10px;
             margin-bottom: 10px; border-radius: 5px;
+            resize: vertical;
+            box-sizing: border-box; /* Pour inclure padding et border dans la largeur */
         }
         button { 
-            background: #ff8c00; color: #000; 
-            border: none; padding: 10px 20px; 
+            background: #ff8c00; color: #0a0a0a; 
+            border: none; padding: 12px 25px; 
             font-weight: bold; cursor: pointer; border-radius: 5px;
+            font-size: 1em; transition: background-color 0.2s ease;
         }
         button:hover { background: #ffa500; }
         #console { 
             margin-top: 20px; background: #000; 
             padding: 15px; border: 1px dashed #555;
-            min-height: 200px; white-space: pre-wrap;
+            min-height: 300px; white-space: pre-wrap; 
+            overflow-y: auto; border-radius: 5px;
+            color: #ccc; font-size: 0.9em;
         }
-        .status { color: #555; font-size: 0.8em; margin-top: 5px; }
+        .status { color: #555; font-size: 0.8em; margin-top: 10px; text-align: center; }
+        .log-timestamp { color: #888; margin-right: 5px; }
+        .log-success { color: #00ff00; }
+        .log-error { color: #ff0000; }
+        .log-info { color: #ff8c00; }
+        .code-block { 
+            background: #000; border: 1px solid #333; padding: 10px; margin: 10px 0; 
+            white-space: pre-wrap; word-break: break-all; font-family: 'Fira Code', 'JetBrains Mono', monospace; 
+            font-size: 0.85em; max-height: 250px; overflow-y: auto; color: #00ff00;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🍊 PAMPLEMOUCHE CLAUDE CODE</h1>
+        <h1>🍊 PAMPLEMOUCHE-DEV-AI CONTROL</h1>
         
-        <label>Instruction pour l'IA :</label>
-        <textarea id="prompt" placeholder="Ex: Crée un dossier /apps/music et ajoute un fichier player.js..."></textarea>
+        <div class="input-area">
+            <label for="prompt">Instruction pour l'IA (format naturel) :</label>
+            <textarea id="prompt" placeholder="Ex: Crée un fichier core/init.js qui initialise le VFS et le Kernel."></textarea>
+            <button onclick="executeAICommand()">EXÉCUTER LE PATCH</button>
+        </div>
         
-        <button onclick="askClaude()">EXÉCUTER LE PATCH</button>
-        
-        <div id="console">Système prêt. En attente d'instructions...</div>
-        <div class="status">Connecté au Proxy Vercel via /api/chat</div>
+        <div id="console">
+            <span class="log-timestamp">[System]</span> <span class="log-info">Pamplemouche-Dev-AI prêt. En attente d'instructions...</span>
+        </div>
+        <div class="status">Connecté via Vercel à Gemini et GitHub.</div>
     </div>
 
     <script>
-        async function askClaude() {
-            const prompt = document.getElementById('prompt').value;
-            const log = document.getElementById('console');
+        const consoleLog = document.getElementById('console');
+
+        function appendLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            let logEntry = `<span class="log-timestamp">[${timestamp}]</span> `;
+            switch(type) {
+                case 'success': logEntry += `<span class="log-success">${message}</span>`; break;
+                case 'error': logEntry += `<span class="log-error">${message}</span>`; break;
+                case 'info':
+                default: logEntry += `<span class="log-info">${message}</span>`; break;
+            }
+            consoleLog.innerHTML += logEntry + '<br>';
+            consoleLog.scrollTop = consoleLog.scrollHeight; // Scroll to bottom
+        }
+
+        async function executeAICommand() {
+            const prompt = document.getElementById('prompt').value.trim();
+            if (!prompt) {
+                appendLog("L'instruction ne peut pas être vide.", 'error');
+                return;
+            }
             
-            log.innerHTML += `\n[${new Date().toLocaleTimeString()}] Envoi à Claude...`;
+            appendLog(`🧠 Envoi de la commande à Gemini...`, 'info');
             
             try {
+                // Étape 1: Demander à Gemini de générer la commande (path, code, explication)
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt, context: "Architecture Pamplemouche OS v1" })
+                    body: JSON.stringify({ prompt: prompt, context: "Architecture Pamplemouche OS (Web, JS/HTML/CSS, VFS, Kernel)" })
                 });
                 
-                const data = await response.json();
-                log.innerHTML += `\n[OK] Réponse reçue. Application sur GitHub...`;
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`Erreur Gemini (HTTP ${response.status}): ${errorData.error || 'Inconnu'}`);
+                }
                 
-                // On appellera le commit ici à l'étape suivante
-                console.log(data.completion);
+                const data = await response.json(); // { path, code, explanation }
+
+                if (!data || !data.path || !data.code) {
+                    throw new Error("Gemini n'a pas retourné le format JSON attendu (path, code)");
+                }
+
+                appendLog(`✅ Commande interprétée: ${data.explanation}`, 'info');
+                appendLog(`🎯 Fichier cible: ${data.path}`, 'info');
+                appendLog(`Code généré par Gemini:`, 'info');
+                consoleLog.innerHTML += `<div class="code-block">${escapeHtml(data.code)}</div>`;
                 
+                // Étape 2: Envoyer le code généré à GitHub
+                appendLog(`🚀 Envoi du patch à GitHub pour ${data.path}...`, 'info');
+
+                const gitRes = await fetch('/api/github', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        path: data.path, 
+                        content: data.code,
+                        message: `Pamplemouche-Dev: ${data.explanation}` // Message de commit sur GitHub
+                    })
+                });
+
+                if (gitRes.ok) {
+                    appendLog(`✅ Succès ! Le fichier ${data.path} a été mis à jour sur GitHub.`, 'success');
+                } else {
+                    const errorGitData = await gitRes.json();
+                    appendLog(`❌ ERREUR lors de l'écriture sur GitHub (HTTP ${gitRes.status}): ${errorGitData.message || JSON.stringify(errorGitData)}`, 'error');
+                }
+
             } catch (err) {
-                log.innerHTML += `\n[ERREUR] ${err.message}`;
+                appendLog(`❌ ERREUR CRITIQUE: ${err.message}`, 'error');
+                console.error("Détails de l'erreur:", err); // Pour le débogage
             }
+        }
+
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
     </script>
 </body>
