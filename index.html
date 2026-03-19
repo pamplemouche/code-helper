@@ -2,29 +2,63 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pamplemouche OS Master Control</title>
     <style>
-        body { background: #050505; color: #ff8c00; font-family: 'monospace'; padding: 20px; }
-        #terminal { background: #000; border: 1px solid #ff8c00; height: 70vh; overflow-y: auto; padding: 15px; margin-bottom: 20px; border-radius: 5px; box-shadow: 0 0 20px rgba(255,140,0,0.2); }
-        .input-box { display: flex; gap: 10px; }
-        textarea { flex: 1; background: #111; border: 1px solid #333; color: #fff; padding: 15px; border-radius: 5px; font-size: 1.1em; }
-        button { background: #ff8c00; border: none; padding: 0 30px; font-weight: bold; cursor: pointer; border-radius: 5px; }
-        .log-ai { color: #00ffcc; margin: 10px 0; border-left: 2px solid #00ffcc; padding-left: 10px; }
-        .log-sys { color: #888; font-size: 0.8em; }
-        .code-preview { background: #0a0a0a; color: #0f0; padding: 10px; font-size: 0.8em; border: 1px solid #1a1a1a; max-height: 150px; overflow: hidden; }
+        body { background: #050505; color: #ff8c00; font-family: 'Courier New', monospace; padding: 20px; margin: 0; }
+        .container { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; height: 95vh; }
+        h1 { border-bottom: 2px solid #ff8c00; padding-bottom: 10px; color: #fff; text-align: center; font-size: 1.5em; }
+        
+        #terminal { 
+            flex-grow: 1; background: #000; border: 1px solid #ff8c00; 
+            overflow-y: auto; padding: 15px; margin-bottom: 20px; 
+            border-radius: 5px; box-shadow: 0 0 20px rgba(255,140,0,0.1); 
+        }
+
+        .input-box { display: flex; gap: 10px; padding-bottom: 10px; }
+        textarea { 
+            flex: 1; background: #111; border: 1px solid #333; color: #fff; 
+            padding: 15px; border-radius: 5px; font-size: 16px; /* 16px évite le zoom auto sur iPad */
+            resize: none; outline: none; border: 1px solid #ff8c00;
+        }
+        
+        button { 
+            background: #ff8c00; border: none; padding: 0 30px; 
+            font-weight: bold; cursor: pointer; border-radius: 5px;
+            color: #000; transition: 0.2s;
+        }
+        button:hover { background: #fff; }
+
+        .log-user { color: #888; margin-top: 15px; font-weight: bold; }
+        .log-ai { color: #00ffcc; margin: 10px 0; border-left: 3px solid #00ffcc; padding-left: 10px; background: rgba(0, 255, 204, 0.05); padding: 10px; }
+        .log-sys { color: #ffae00; font-size: 0.9em; margin: 5px 0; }
+        .code-preview { 
+            background: #0a0a0a; color: #0f0; padding: 10px; 
+            font-size: 0.85em; border: 1px solid #1a1a1a; 
+            margin-top: 5px; white-space: pre-wrap; word-break: break-all;
+            max-height: 200px; overflow-y: auto;
+        }
+        .error { color: #ff4444; border-left: 3px solid #ff4444; }
     </style>
 </head>
 <body>
-    <h1>🍊 PAMPLEMOUCHE ENGINE</h1>
-    <div id="terminal"></div>
-    <div class="input-box">
-        <textarea id="prompt" placeholder="Commande (ex: Crée une VM Web avec VFS dans le repo X...)"></textarea>
-        <button onclick="run()">PUSH</button>
+    <div class="container">
+        <h1>🍊 PAMPLEMOUCHE ENGINE</h1>
+        
+        <div id="terminal">
+            <div class="log-sys">[System] Engine prêt. En attente d'instructions universelles...</div>
+        </div>
+
+        <div class="input-box">
+            <textarea id="prompt" placeholder="Ex: Crée un nouveau repo 'ma-vm' et ajoute un kernel.js dedans..."></textarea>
+            <button id="pushBtn" onclick="run()">PUSH</button>
+        </div>
     </div>
 
     <script>
-        let history = [];
+        let conversationHistory = [];
         const term = document.getElementById('terminal');
+        const promptInput = document.getElementById('prompt');
 
         function log(msg, type='sys') {
             const div = document.createElement('div');
@@ -35,34 +69,87 @@
         }
 
         async function run() {
-            const prompt = document.getElementById('prompt').value;
-            if(!prompt) return;
-            document.getElementById('prompt').value = '';
-            
-            log(`> EXECUTING: ${prompt}`, 'sys');
+            const userPrompt = promptInput.value.trim();
+            if(!userPrompt) return;
+
+            // Désactive le bouton pendant l'envoi
+            const btn = document.getElementById('pushBtn');
+            btn.disabled = true;
+            btn.innerText = "...";
+
+            log(`> EXECUTING: ${userPrompt}`, 'user');
+            promptInput.value = '';
 
             try {
+                // 1. Appel à Gemini 1.5 Pro
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ prompt, history })
+                    body: JSON.stringify({ 
+                        prompt: userPrompt, 
+                        history: conversationHistory 
+                    })
                 });
+                
                 const data = await res.json();
-                history.push(data.fullResponse);
+                
+                if (data.error) {
+                    log(`❌ ERREUR IA: ${data.error}`, 'sys error');
+                    return;
+                }
 
-                log(`IA: ${data.explanation} <br> <div class="code-preview">${data.code.substring(0,200)}...</div>`, 'ai');
+                // Sauvegarde l'historique pour la mémoire
+                if (data.fullResponse) {
+                    conversationHistory.push(data.fullResponse);
+                }
 
-                const git = await fetch('/api/github', {
+                // Affichage du plan de l'IA
+                log(`<b>IA (${data.repo})</b>: ${data.explanation}`, 'ai');
+                if (data.code) {
+                    const preview = document.createElement('div');
+                    preview.className = 'code-preview';
+                    preview.innerText = data.code.substring(0, 500) + (data.code.length > 500 ? "..." : "");
+                    term.appendChild(preview);
+                }
+
+                // 2. Déploiement GitHub (Fichier + Option Repo)
+                log(`🚀 Connexion à GitHub [${data.repo}]...`, 'sys');
+                
+                const gitRes = await fetch('/api/github', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ repo: data.repo, path: data.path, content: data.code, message: data.explanation })
+                    body: JSON.stringify({ 
+                        repo: data.repo, 
+                        path: data.path, 
+                        content: data.code, 
+                        message: data.explanation,
+                        createRepo: data.createRepo || false
+                    })
                 });
 
-                if(git.ok) log(`✅ DEPLOYED TO ${data.repo}/${data.path}`, 'sys');
-                else log(`❌ GITHUB ERROR`, 'sys');
+                const gitData = await gitRes.json();
 
-            } catch(e) { log(`❌ CRASH: ${e.message}`, 'sys'); }
+                if (gitRes.ok) {
+                    log(`✅ SUCCÈS: Fichier '${data.path}' déployé sur ${data.repo}`, 'sys');
+                } else {
+                    log(`❌ ERREUR GITHUB: ${gitData.error || 'Échec du push'}`, 'sys error');
+                }
+
+            } catch(e) { 
+                log(`❌ CRASH SYSTÈME: ${e.message}`, 'sys error'); 
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "PUSH";
+                term.scrollTop = term.scrollHeight;
+            }
         }
+
+        // Permet d'envoyer avec Cmd+Enter ou Ctrl+Enter sur iPad
+        promptInput.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                run();
+            }
+        });
     </script>
 </body>
 </html>
