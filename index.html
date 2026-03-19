@@ -3,44 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pamplemouche Engine v3.0</title>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <title>Pamplemouche Engine v3.1</title>
     <style>
-        body { background: #050505; color: #ccc; font-family: sans-serif; margin: 0; display: flex; justify-content: center; }
+        body { background: #050505; color: #eee; font-family: sans-serif; margin: 0; display: flex; justify-content: center; }
         .container { width: 100%; max-width: 900px; height: 100vh; display: flex; flex-direction: column; border-left: 1px solid #222; border-right: 1px solid #222; }
         
-        #chat { flex-grow: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+        #chat { flex-grow: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
         
-        .msg { max-width: 90%; line-height: 1.6; font-size: 16px; border-radius: 10px; padding: 12px; }
-        .user { align-self: flex-end; background: #222; color: #fff; border: 1px solid #333; }
-        .ai { align-self: flex-start; width: 100%; color: #eee; }
+        .msg { padding: 12px; border-radius: 8px; white-space: pre-wrap; font-size: 15px; line-height: 1.4; max-width: 85%; }
+        .user { align-self: flex-end; background: #ff8c00; color: #000; font-weight: bold; }
+        .ai { align-self: flex-start; background: #111; border: 1px solid #333; color: #00ffcc; }
         
-        /* Blocs de code */
-        pre { background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333; overflow-x: auto; color: #00ffcc; }
-        code { font-family: 'Consolas', monospace; }
-
-        .sync-info { 
-            background: rgba(255, 140, 0, 0.1); color: #ff8c00; 
-            padding: 8px; border-radius: 5px; font-size: 12px; 
-            border: 1px solid #ff8c00; margin-bottom: 10px; display: none;
-        }
+        /* Zone de statut pour le push */
+        #sync-bar { background: #000; color: #ff8c00; padding: 10px; font-size: 12px; border-bottom: 1px solid #222; text-align: center; display: none; }
 
         .input-area { padding: 20px; background: #0a0a0a; border-top: 1px solid #222; }
-        .input-wrapper { display: flex; gap: 10px; background: #161616; padding: 10px; border-radius: 12px; border: 1px solid #333; }
+        .input-wrapper { display: flex; gap: 10px; background: #161616; padding: 10px; border-radius: 10px; border: 1px solid #333; }
         textarea { flex: 1; background: transparent; border: none; color: #fff; resize: none; outline: none; font-size: 16px; height: 50px; }
-        button { background: #ff8c00; border: none; padding: 0 25px; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        button { background: #ff8c00; border: none; padding: 0 20px; border-radius: 8px; font-weight: bold; cursor: pointer; color: #000; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div id="sync-status" class="sync-info"></div>
+        <div id="sync-bar"></div>
         <div id="chat">
-            <div class="msg ai"><b>Pamplemouche Engine v3.0</b><br>Prêt à collaborer. Discutons et codons !</div>
+            <div class="msg ai">Prêt pour la collab. Pas de chichis, juste du code.</div>
         </div>
 
         <div class="input-area">
             <div class="input-wrapper">
-                <textarea id="prompt" placeholder="Action ou discussion..."></textarea>
+                <textarea id="prompt" placeholder="Discute ou demande du code..."></textarea>
                 <button onclick="send()">ENVOYER</button>
             </div>
         </div>
@@ -49,12 +41,12 @@
     <script>
         let history = [];
         const chat = document.getElementById('chat');
-        const syncStatus = document.getElementById('sync-status');
+        const syncBar = document.getElementById('sync-bar');
 
         function addMsg(role, content) {
             const div = document.createElement('div');
             div.className = `msg ${role}`;
-            div.innerHTML = role === 'ai' ? marked.parse(content) : content;
+            div.textContent = content;
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
         }
@@ -74,41 +66,40 @@
                 });
                 
                 const data = await res.json();
-                addMsg('ai', data.text); // Affiche le texte Markdown
+                
+                // Affichage direct du texte (pas de Marked = pas de crash)
+                addMsg('ai', data.text || "J'ai traité ta demande.");
                 
                 history.push({ role: "user", parts: [{ text: prompt }] });
                 history.push(data.fullResponse);
 
-                // --- INTERCEPTION DU CODE ---
-                // On cherche "Fichier: USER/REPO/PATH" et un bloc de code
-                const fileMatch = data.text.match(/Fichier:\s*([^\s\n]+)/);
-                const codeMatch = data.text.match(/```[a-z]*\n([\s\S]*?)```/);
+                // --- LOGIQUE D'INTERCEPTION DU CODE ---
+                const fileLine = data.text.match(/Fichier:\s*([^\s\n]+)/);
+                const codeBlock = data.text.match(/```[a-z]*\n([\s\S]*?)```/);
 
-                if (fileMatch && codeMatch) {
-                    const fullPath = fileMatch[1];
-                    const code = codeMatch[1];
+                if (fileLine && codeBlock) {
+                    const fullPath = fileLine[1];
+                    const code = codeBlock[1];
                     
-                    syncStatus.style.display = "block";
-                    syncStatus.innerText = `🚀 Synchronisation de ${fullPath}...`;
+                    syncBar.style.display = "block";
+                    syncBar.textContent = `🚀 SYNC : ${fullPath}...`;
 
                     const parts = fullPath.split('/');
                     const repo = `${parts[0]}/${parts[1]}`;
                     const path = parts.slice(2).join('/');
 
-                    const git = await fetch('/api/github', {
+                    await fetch('/api/github', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ repo, path, content: code, message: "Maj via Collab" })
+                        body: JSON.stringify({ repo, path, content: code, message: "Collab Push" })
                     });
 
-                    if(git.ok) syncStatus.innerText = `✅ Déployé : ${fullPath}`;
-                    else syncStatus.innerText = `❌ Erreur Push GitHub`;
-                    
-                    setTimeout(() => { syncStatus.style.display = "none"; }, 3000);
+                    syncBar.textContent = `✅ OK : ${fullPath}`;
+                    setTimeout(() => { syncBar.style.display = "none"; }, 3000);
                 }
 
             } catch(e) {
-                addMsg('ai', "Erreur de flux : " + e.message);
+                addMsg('ai', "Erreur : " + e.message);
             }
         }
     </script>
