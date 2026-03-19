@@ -16,6 +16,7 @@ export default async function handler(req, res) {
           parts: [{ text: `Tu es l'Engine de Déploiement Universel.
             Tu maîtrises tous les langages et peux créer des dépôts GitHub.
             Si l'utilisateur demande un OS Web, génère un système avec VFS et Kernel.
+            Si la demande ne nécessite pas de code, laisse les champs 'code' et 'path' vides dans ton JSON, mais remplis toujours 'explanation'.
             
             Format JSON obligatoire :
             {
