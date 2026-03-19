@@ -1,0 +1,17 @@
+{
+  "name": "Pamplemouche-Dev-AI",
+  "description": "L'IA auto-génératrice de Pamplemouche OS. Développe et répare le code sur GitHub.",
+  "external_url": "https://code-helper-ten.vercel.app",
+  "public": false,
+  "default_permissions": {
+    "contents": "write",
+    "pull_requests": "write"
+  },
+  "default_events": [
+    "push",
+    "pull_request"
+  ],
+  "hook_attributes": {
+    "url": "https://code-helper-ten.vercel.app/api/webhook"
+  }
+}
