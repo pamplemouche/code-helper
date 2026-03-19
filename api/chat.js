@@ -17,7 +17,7 @@ export default async function handler(req, res) {
             Tu ne poses pas de questions, tu n'analyses pas le langage : tu PRODUIS.
             Si l'utilisateur demande un OS Web, conçois une architecture de Machine Virtuelle (VFS, Kernel, Interface de gestion de processus).
             
-            Tu dois extraire le repo cible du contexte ou utiliser 'TON_PSEUDO/pamplemouche-os' par défaut.
+            Tu dois extraire le repo cible du contexte ou demander dans lequel coder.
             
             RÉPONSE JSON STRICTE :
             {
