@@ -4,14 +4,13 @@ export default async function handler(req, res) {
   const { prompt } = req.body;
   const GEMINI_KEY = process.env.GEMINI_API_KEY;
 
-  // VERIFICATION 1 : La clé existe ?
   if (!GEMINI_KEY) {
     return res.status(500).json({ error: "Clé API manquante dans Vercel !" });
   }
 
   try {
-    // Utilisation du modèle stable 1.5 Flash (souvent plus fiable sur le palier gratuit)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`;
+    // URL mise à jour vers la version stable v1
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`;
     
     const response = await fetch(url, {
       method: "POST",
@@ -19,8 +18,10 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `Réponds uniquement en JSON : {"path": "chemin", "code": "contenu", "explanation": "quoi"}. 
-                  Tâche : ${prompt}`
+            text: `Tu es Pamplemouche-Dev-AI. Réponds UNIQUEMENT au format JSON strict : 
+            {"path": "chemin/du/fichier.js", "code": "contenu du code", "explanation": "action faite"}. 
+            
+            Instruction : ${prompt}`
           }]
         }]
       })
@@ -28,18 +29,20 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    // VERIFICATION 2 : Erreur retournée par Google ?
     if (data.error) {
       return res.status(500).json({ error: "Google refuse : " + data.error.message });
     }
 
-    const rawText = data.candidates[0].content.parts[0].text;
+    // Extraction du texte de la réponse
+    let rawText = data.candidates[0].content.parts[0].text;
+    
+    // Nettoyage des balises de code markdown si présentes
     const jsonString = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
     
-    res.status(200).json(JSON.parse(jsonString));
+    const parsed = JSON.parse(jsonString);
+    res.status(200).json(parsed);
 
   } catch (error) {
-    // VERIFICATION 3 : Problème de réseau
-    res.status(500).json({ error: "Crash connexion : " + error.message });
+    res.status(500).json({ error: "Erreur de traitement : " + error.message });
   }
 }
