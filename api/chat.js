@@ -3,41 +3,46 @@ export default async function handler(req, res) {
   const { prompt, history } = req.body;
 
   try {
-    // On utilise le modèle PRO pour plus de précision
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_KEY}`;
-    
-    const response = await fetch(url, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: history || [], 
         generationConfig: {
           response_mime_type: "application/json",
-          temperature: 0.1 // Très bas pour éviter les erreurs de syntaxe
+          temperature: 0.2
         },
         system_instruction: {
-          parts: [{ text: "Tu es l'ingénieur principal de Pamplemouche, et tu code enormement de choses sur demande sans t'eterniser. Tu génères du code JS/HTML/CSS robuste voire pour le cas de Pamplemouche OS un vrai os qui tourne en machine virtuelle web. Réponds TOUJOURS au format JSON: {'path': 'string', 'code': 'string', 'explanation': 'string'}" }]
+          parts: [{ text: `Tu es un Engine de Développement Universel. 
+            Tu ne poses pas de questions, tu n'analyses pas le langage : tu PRODUIS.
+            Si l'utilisateur demande un OS Web, conçois une architecture de Machine Virtuelle (VFS, Kernel, Interface de gestion de processus).
+            
+            Tu dois extraire le repo cible du contexte ou utiliser 'TON_PSEUDO/pamplemouche-os' par défaut.
+            
+            RÉPONSE JSON STRICTE :
+            {
+              "repo": "user/repo",
+              "path": "chemin/du/fichier",
+              "code": "CONTENU_BRUT_DU_CODE",
+              "explanation": "DESCRIPTION_COURTE"
+            }` }]
         }
       })
     });
 
     const data = await response.json();
-    
-    if (data.error) {
-        return res.status(500).json({ error: "Erreur Google: " + data.error.message });
-    }
+    if (data.error) throw new Error(data.error.message);
 
-    const text = data.candidates[0].content.parts[0].text;
-    const jsonParsed = JSON.parse(text);
+    const jsonParsed = JSON.parse(data.candidates[0].content.parts[0].text.trim());
 
     res.status(200).json({
+        repo: jsonParsed.repo,
         path: jsonParsed.path,
         code: jsonParsed.code,
         explanation: jsonParsed.explanation,
         fullResponse: data.candidates[0].content 
     });
-
   } catch (e) {
-    res.status(500).json({ error: "Erreur : " + e.message });
+    res.status(500).json({ error: e.message });
   }
 }
